@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <title>{% if invoice %}Invoice #{{ "%05d" | format(invoice["id"]) }} from {{ company["name"] }}{% else %}Invoice not available{% endif %}</title>
+</head>
+<body class="public-body">
+  <main class="invoice-page public-page">
+    {% if invoice %}
+      {% set balance = invoice["total_cents"] - invoice["paid_cents"] %}
+      {% set show_admin_links = false %}
+      {% include "_invoice_doc.html" %}
+
+      <div class="no-print share-bar" style="justify-content:center;">
+        <button type="button" onclick="window.print()"><i class="ri-download-2-line" aria-hidden="true"></i> Save as PDF / Print</button>
+        {% set biz_wa = whatsapp_number(company["phone"]) %}
+        {% if biz_wa %}
+        <a class="button button-whatsapp" target="_blank" rel="noopener"
+           href="https://wa.me/{{ biz_wa }}?text={{ ('Hello ' ~ company['name'] ~ ', about invoice #' ~ ('%05d' | format(invoice['id'])) ~ ':') | urlencode }}">
+          <i class="ri-whatsapp-line" aria-hidden="true"></i> Message {{ company["name"] }}
+        </a>
+        {% elif company["phone"] %}
+        <a class="button button-secondary" href="tel:{{ company['phone'] }}"><i class="ri-phone-line" aria-hidden="true"></i> Call {{ company["name"] }}</a>
+        {% endif %}
+      </div>
+      <p class="public-note no-print">To save as PDF: tap <b>Save as PDF / Print</b>, then choose <b>Save as PDF</b>.</p>
+    {% else %}
+      <div class="empty" style="margin-top: 15vh;">
+        <strong>This invoice isn't available</strong>
+        The link may be wrong, or the invoice was cancelled. Please contact the business that sent it.
+      </div>
+    {% endif %}
+  </main>
+  <footer class="no-print public-foot">Sent with Invoice Generator</footer>
+</body>
+</html>

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Invoices — Invoice Generator{% endblock %}
+{% block content %}
+  {% set active = invoices | selectattr('status', 'equalto', 'active') | list %}
+  {% set cancelled_n = invoices | length - active | length %}
+  {% set in_cur = active | selectattr('currency', 'equalto', company_currency) | list %}
+  {% set billed = in_cur | sum(attribute='total_cents') %}
+  {% set owed = (in_cur | sum(attribute='total_cents')) - (in_cur | sum(attribute='paid_cents')) %}
+  {% set n = namespace(unpaid=0, overdue=0, paid=0) %}
+  {% for inv in invoices %}{% set st = payment_status(inv) %}
+    {% if st in ('unpaid', 'part', 'overdue') %}{% set n.unpaid = n.unpaid + 1 %}{% endif %}
+    {% if st == 'overdue' %}{% set n.overdue = n.overdue + 1 %}{% endif %}
+    {% if st == 'paid' %}{% set n.paid = n.paid + 1 %}{% endif %}
+  {% endfor %}
+
+  <div class="page-hero">
+    <div>
+      <div class="eyebrow">Billing</div>
+      <h1>Invoices</h1>
+      <p>Every invoice your company has created. Click a row to open it.</p>
+    </div>
+    <div class="hero-actions">
+      <a class="button" href="{{ url_for('new_invoice') }}"><i class="ri-add-line" aria-hidden="true"></i> New invoice</a>
+    </div>
+  </div>
+
+  {% if invoices %}
+  <div class="summary">
+    <div class="is-blue"><div class="s-label">Total billed</div><div class="s-value">{{ billed | money }}</div></div>
+    <div><div class="s-label">Invoices</div><div class="s-value">{{ invoices | length }}</div></div>
+    <div class="{{ 'is-orange' if owed > 0 else '' }}"><div class="s-label">Owed to you</div><div class="s-value">{{ owed | money }}</div></div>
+    <div class="{{ 'is-orange' if n.overdue else '' }}"><div class="s-label">Overdue</div><div class="s-value">{{ n.overdue }}</div></div>
+  </div>
+
+  <div class="toolbar">
+    <label class="search">
+      <i class="ri-search-line" aria-hidden="true"></i>
+      <span class="visually-hidden">Search invoices</span>
+      <input type="search" placeholder="Search by customer, number or teammate" data-search="invoice-rows" />
+    </label>
+    <div class="chips" data-chips="invoice-rows" role="group" aria-label="Filter invoices">
+      <button type="button" class="chip" data-chip="all" aria-pressed="true">All<span class="n">{{ invoices | length }}</span></button>
+      <button type="button" class="chip" data-chip="owing" aria-pressed="false">Unpaid<span class="n">{{ n.unpaid }}</span></button>
+      <button type="button" class="chip" data-chip="overdue" aria-pressed="false">Overdue<span class="n">{{ n.overdue }}</span></button>
+      <button type="button" class="chip" data-chip="paid" aria-pressed="false">Paid<span class="n">{{ n.paid }}</span></button>
+      <button type="button" class="chip" data-chip="cancelled" aria-pressed="false">Cancelled<span class="n">{{ cancelled_n }}</span></button>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th scope="col">Invoice</th><th scope="col">Customer</th><th scope="col">Date</th><th scope="col">Status</th><th scope="col">Created by</th><th scope="col" style="text-align:right;">Total</th></tr>
+    </thead>
+    <tbody id="invoice-rows">
+      {% for inv in invoices %}
+      <tr data-item data-href="{{ url_for('view_invoice', invoice_id=inv['id']) }}"
+          {% set st = payment_status(inv) %}
+          data-state="{{ st }}{% if st in ('unpaid', 'part', 'overdue') %} owing{% endif %}"
+          data-text="{{ inv['id'] }} {{ inv['customer'] | lower }} {{ (inv['created_by_email'] or '') | lower }}"
+          {% if inv["status"] == "cancelled" %}class="is-cancelled"{% endif %}>
+        <td data-label="Invoice"><a class="inv-id" href="{{ url_for('view_invoice', invoice_id=inv['id']) }}">#{{ "%05d" | format(inv['id']) }}</a></td>
+        <td data-label="Customer">
+          {{ inv["customer"] }}
+        </td>
+        <td data-label="Date">{{ inv["date"] | nicedate }}</td>
+        <td data-label="Status">
+          {% set lbl = PAYMENT_STATUS_LABELS[st] %}
+          <span>
+            <span class="badge {{ lbl[1] }}">{{ lbl[0] }}</span>
+            {% if st in ('part', 'unpaid', 'overdue') %}<span class="muted" style="font-size:12.5px;"> {{ (inv['total_cents'] - inv['paid_cents']) | money(inv['currency']) }} left</span>{% endif %}
+          </span>
+        </td>
+        <td data-label="Created by">{{ inv["created_by_email"] or "—" }}</td>
+        <td data-label="Total" style="text-align:right; font-weight:700;">{{ inv["total_cents"]|money(inv["currency"]) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="empty no-results" data-empty-for="invoice-rows"><strong>No invoices match</strong>Try another search or filter.</div>
+  {% else %}
+  <div class="empty">
+    <strong>No invoices yet</strong>
+    Your invoices will show up here once you create one.
+    <br /><a class="button" href="{{ url_for('new_invoice') }}">Create your first invoice</a>
+  </div>
+  {% endif %}
+{% endblock %}

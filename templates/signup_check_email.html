@@ -1,0 +1,22 @@
+{% extends "auth_base.html" %}
+{% block title %}Check your email{% endblock %}
+
+{% block heading %}
+<div class="steps" aria-hidden="true"><span class="is-done"></span><span class="is-done"></span><span class="is-done"></span><span class="is-active"></span></div>
+<div class="step-count">Last step</div>
+<h1 class="login_title">Check your inbox</h1>
+{% endblock %}
+
+{% block content %}
+<p class="login_subtitle">
+    {% if email %}
+    We sent a verification link to <strong>{{ email }}</strong>. Click it to activate your account, then come back and log in.
+    {% else %}
+    If that signup went through, a verification link is on its way to your inbox.
+    {% endif %}
+</p>
+<div class="login_form">
+    <a class="button login_button" href="{{ url_for('login') }}">I've verified, take me to login</a>
+    <p class="login_sign">Nothing after a few minutes? Check spam, or <a href="{{ url_for('resend_verification', email=email) }}">resend the link</a>.</p>
+</div>
+{% endblock %}

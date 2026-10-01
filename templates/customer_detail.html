@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ customer["name"] }} — Invoice Generator{% endblock %}
+{% block content %}
+  {% set parts = (customer['name'] or '?').split() %}
+  {% set active = invoices | selectattr('status', 'equalto', 'active') | list %}
+  {% set in_cur = active | selectattr('currency', 'equalto', company_currency) | list %}
+  {% set owed = (in_cur | sum(attribute='total_cents')) - (in_cur | sum(attribute='paid_cents')) %}
+
+  <a class="back-link" href="{{ url_for('customers_page') }}" style="margin: 0 0 var(--space-3);">← All customers</a>
+
+  <div class="page-hero">
+    <div class="profile">
+      <span class="initials big" aria-hidden="true">{{ (parts[0][:1] ~ (parts[1][:1] if parts | length > 1 else '')) | upper }}</span>
+      <div class="who">
+        <div class="eyebrow">Customer</div>
+        <h1>{{ customer["name"] }}</h1>
+        <div class="contact">
+          <a href="mailto:{{ customer['email'] }}"><i class="ri-mail-line" aria-hidden="true"></i>{{ customer["email"] }}</a>
+          {% if customer["phone"] %}<a href="tel:{{ customer['phone'] }}"><i class="ri-phone-line" aria-hidden="true"></i>{{ customer["phone"] }}</a>{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="hero-actions">
+      <a class="button" href="{{ url_for('new_invoice') }}"><i class="ri-add-line" aria-hidden="true"></i> New invoice</a>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="is-blue"><div class="s-label">Total billed</div><div class="s-value">{{ in_cur | sum(attribute='total_cents') | money }}</div></div>
+    <div class="{{ 'is-orange' if owed > 0 else '' }}"><div class="s-label">Owes you</div><div class="s-value">{{ owed | money }}</div></div>
+    <div><div class="s-label">Invoices</div><div class="s-value">{{ invoices | length }}</div></div>
+    <div><div class="s-label">Last invoice</div><div class="s-value" style="font-size:1.05rem;">{{ (invoices[0]['date'] | nicedate) if invoices else '—' }}</div></div>
+  </div>
+
+  <section class="panel" aria-labelledby="history-heading">
+    <h2 id="history-heading">Invoice history</h2>
+    {% if invoices %}
+    <table>
+      <thead>
+        <tr><th scope="col">Invoice</th><th scope="col">Date</th><th scope="col" style="text-align:right;">Total</th></tr>
+      </thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr data-href="{{ url_for('view_invoice', invoice_id=inv['id']) }}" {% if inv["status"] == "cancelled" %}class="is-cancelled"{% endif %}>
+          <td data-label="Invoice"><a class="inv-id" href="{{ url_for('view_invoice', invoice_id=inv['id']) }}">#{{ "%05d" | format(inv['id']) }}</a></td>
+          <td data-label="Date">
+            {% set st = payment_status(inv) %}{% set lbl = PAYMENT_STATUS_LABELS[st] %}
+            <span>{{ inv["date"] | nicedate }} <span class="badge {{ lbl[1] }}">{{ lbl[0] }}</span></span>
+          </td>
+          <td data-label="Total" style="text-align:right; font-weight:700;">{{ inv["total_cents"]|money(inv["currency"]) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty"><strong>No invoices for this customer yet</strong><a class="button" href="{{ url_for('new_invoice') }}">Bill them now</a></div>
+    {% endif %}
+  </section>
+{% endblock %}

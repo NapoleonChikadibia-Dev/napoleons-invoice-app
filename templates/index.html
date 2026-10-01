@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Invoice Generator{% endblock %}
+{% block content %}
+  {% set is_owner = session.get('role') == 'owner' %}
+
+  <div class="page-hero is-dark">
+    <div>
+      <div class="eyebrow">{{ revenue[-1].label if revenue else '' }} overview</div>
+      <h1><span id="greet">Welcome back</span>, {{ session.get('company_name', '') }}</h1>
+      <p>{% if stats.low_stock %}{{ stats.low_stock }} product{{ '' if stats.low_stock == 1 else 's' }} need{{ 's' if stats.low_stock == 1 else '' }} restocking. {% endif %}Here's how your business is doing this month.</p>
+    </div>
+    <div class="hero-actions">
+      <a class="button button-secondary" href="{{ url_for('invoice_history') }}"><i class="ri-file-list-3-line" aria-hidden="true"></i> Invoices</a>
+      {% if stats.low_stock %}
+      <a class="button button-orange" href="{{ url_for('low_stock') }}"><i class="ri-alarm-warning-line" aria-hidden="true"></i> Restock {{ stats.low_stock }}</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ---------- Getting-started checklist (hides itself once done) ---------- #}
+  {% if is_owner %}
+    {% set tasks = [
+      {'done': stats.products > 0,  'title': 'Add your first product',      'desc': 'What you sell, its price and how many you have.', 'href': url_for('products_page'),  'cta': 'Add product'},
+      {'done': stats.customers > 0, 'title': 'Add a customer',              'desc': 'Who you bill. Name and email are enough.',          'href': url_for('customers_page'), 'cta': 'Add customer'},
+      {'done': stats.invoices > 0,  'title': 'Create your first invoice',   'desc': 'Pick the customer, add products, done.',           'href': url_for('new_invoice'),    'cta': 'Create invoice', 'needs': stats.products > 0},
+      {'done': stats.teammates > 0, 'title': 'Invite your team (optional)', 'desc': 'Set a company passcode and add teammates.',        'href': url_for('team_page'),      'cta': 'Open team'},
+    ] %}
+  {% else %}
+    {% set tasks = [
+      {'done': stats.invoices > 0, 'title': 'Create your first invoice', 'desc': 'Pick a customer, add products, done.', 'href': url_for('new_invoice'), 'cta': 'Create invoice', 'needs': stats.products > 0},
+    ] %}
+  {% endif %}
+  {% set done_count = tasks | selectattr('done') | list | length %}
+  {% set next_task = (tasks | rejectattr('done') | list | first) %}
+  {# The team step is optional, so the card goes away once the first three are done. #}
+  {% set required_done = (tasks[:3] if is_owner else tasks) | rejectattr('done') | list | length == 0 %}
+
+  {% if not required_done and not checklist_dismissed %}
+  <section class="checklist-card" data-tour="checklist" aria-labelledby="checklist-heading">
+    <div class="checklist-head">
+      <div>
+        <h2 id="checklist-heading">Get set up</h2>
+        <p>{{ tasks | length - done_count }} step{{ '' if (tasks | length - done_count) == 1 else 's' }} left before you're fully running.</p>
+      </div>
+      <div class="checklist-actions">
+        <a href="{{ url_for('home', tour=1) }}" class="button button-secondary button-sm" data-tour-start>Take the tour</a>
+        <form action="{{ url_for('dismiss_checklist') }}" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="button-ghost button-sm" title="Hide this checklist">Hide</button>
+        </form>
+      </div>
+    </div>
+    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="{{ tasks | length }}" aria-valuenow="{{ done_count }}" aria-label="Setup progress">
+      <span style="width: {{ (done_count / tasks | length * 100) | round }}%"></span>
+    </div>
+    <div class="progress-label">{{ done_count }} of {{ tasks | length }} done</div>
+    <ol class="checklist">
+      {% for t in tasks %}
+      {% set locked = t.needs is defined and not t.needs and not t.done %}
+      <li class="{% if t.done %}is-done{% elif t is sameas next_task and not locked %}is-next{% elif locked %}is-locked{% endif %}">
+        <span class="check-dot" aria-hidden="true">{% if t.done %}✓{% else %}{{ loop.index }}{% endif %}</span>
+        <div>
+          <div class="check-title">{{ t.title }}{% if t.done %}<span class="visually-hidden"> (done)</span>{% endif %}</div>
+          <div class="check-desc">{% if locked %}Add a product first — invoices need something to bill.{% else %}{{ t.desc }}{% endif %}</div>
+        </div>
+        {% if not t.done and not locked %}
+        <a class="button {% if t is not sameas next_task %}button-secondary {% endif %}button-sm" href="{{ t.href }}">{{ t.cta }}</a>
+        {% else %}<span></span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endif %}
+
+  {# ---------- KPI cards ---------- #}
+  {% set cur = stats.month_total_cents %}
+  {% set prev = stats.prev_month_total_cents %}
+  <div class="kpis">
+    <div class="kpi kpi-hero">
+      <div class="kpi-top">
+        <span class="kpi-label">Billed this month</span>
+        <span class="kpi-icon" aria-hidden="true"><i class="ri-money-dollar-circle-line"></i></span>
+      </div>
+      <div class="kpi-value">{{ cur | money }}</div>
+      <div class="kpi-foot">
+        {% if prev > 0 %}
+          {% set pct = ((cur - prev) / prev * 100) | round | int %}
+          <span class="trend {{ 'up' if pct >= 0 else 'down' }}">{{ '▲' if pct >= 0 else '▼' }} {{ pct | abs }}%</span> vs last month
+        {% elif cur > 0 %}
+          First month with sales
+        {% else %}
+          No sales yet this month
+        {% endif %}
+      </div>
+    </div>
+
+    {% if is_owner %}
+    <div class="kpi">
+      <div class="kpi-top">
+        <span class="kpi-label">Profit this month</span>
+        <span class="kpi-icon tone-blue" aria-hidden="true"><i class="ri-line-chart-line"></i></span>
+      </div>
+      <div class="kpi-value" {% if stats.profit_cents < 0 %}style="color:var(--danger)"{% endif %}>{{ stats.profit_cents | money }}</div>
+      <div class="kpi-foot">
+        {% if stats.products_without_cost %}<a href="{{ url_for('products_page') }}">Add cost prices</a> to {{ stats.products_without_cost }} product{{ '' if stats.products_without_cost == 1 else 's' }}
+        {% elif stats.profit_missing %}Some sales were before cost prices were set
+        {% else %}{{ stats.month_invoices }} invoice{{ '' if stats.month_invoices == 1 else 's' }} this month{% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="kpi">
+      <div class="kpi-top">
+        <span class="kpi-label">Invoices this month</span>
+        <span class="kpi-icon tone-blue" aria-hidden="true"><i class="ri-file-list-3-line"></i></span>
+      </div>
+      <div class="kpi-value">{{ stats.month_invoices }}</div>
+      <div class="kpi-foot">{{ stats.invoices }} all time</div>
+    </div>
+    {% endif %}
+
+    <div class="kpi{% if stats.overdue %} kpi-warn{% endif %}">
+      <div class="kpi-top">
+        <span class="kpi-label">Owed to you</span>
+        <span class="kpi-icon tone-amber" aria-hidden="true"><i class="ri-hand-coin-line"></i></span>
+      </div>
+      <div class="kpi-value">{{ stats.owed_cents | money }}</div>
+      <div class="kpi-foot">
+        {% if stats.owed_invoices %}{{ stats.owed_invoices }} unpaid{% if stats.overdue %} · <b style="color:var(--danger)">{{ stats.overdue }} overdue</b>{% endif %}
+        {% else %}Everyone has paid{% endif %}
+      </div>
+    </div>
+
+    <div class="kpi{% if stats.low_stock %} kpi-warn{% endif %}">
+      <div class="kpi-top">
+        <span class="kpi-label">Low stock</span>
+        <span class="kpi-icon tone-amber" aria-hidden="true"><i class="ri-alarm-warning-line"></i></span>
+      </div>
+      <div class="kpi-value">{{ stats.low_stock }}</div>
+      <div class="kpi-foot">{% if stats.low_stock %}<a href="{{ url_for('low_stock') }}">Restock now →</a>{% else %}All products stocked{% endif %}</div>
+    </div>
+  </div>
+
+  {# ---------- Revenue chart + top products ---------- #}
+  <div class="dash-grid">
+    <section class="panel chart-panel" aria-labelledby="rev-heading">
+      <div class="panel-head">
+        <div>
+          <h2 id="rev-heading">Revenue</h2>
+          <p class="muted" style="margin:0;font-size:13px;">Last 6 months · cancelled invoices excluded</p>
+        </div>
+      </div>
+      {% set peak = revenue | map(attribute='total_cents') | max %}
+      {% if peak and peak > 0 %}
+      <div class="bars" role="img" aria-label="Revenue per month for the last six months">
+        {% for m in revenue %}
+        {% set h = (m.total_cents / peak * 100) if peak else 0 %}
+        <div class="bar-col{% if loop.last %} is-current{% endif %}">
+          <span class="bar-value">{{ m.total_cents | money_short }}</span>
+          <div class="bar-track"><div class="bar" style="height: {{ [h, 2] | max if m.total_cents else 0 }}%" title="{{ m.label }}: {{ m.total_cents | money }}"></div></div>
+          <span class="bar-label">{{ m.label }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty"><strong>No revenue yet</strong>Your monthly totals will chart here after your first invoice.</div>
+      {% endif %}
+    </section>
+
+    <section class="panel" aria-labelledby="top-heading">
+      <div class="panel-head"><h2 id="top-heading">Top products</h2></div>
+      {% if top_products %}
+      {% set top_peak = top_products[0]['total_cents'] or 1 %}
+      <ol class="rank-list">
+        {% for p in top_products %}
+        <li>
+          <div class="rank-row">
+            <span class="rank-name">{{ p['name'] }}</span>
+            <span class="rank-amt">{{ p['total_cents'] | money_short }}</span>
+          </div>
+          <div class="rank-bar"><span style="width: {{ (p['total_cents'] / top_peak * 100) | round }}%" class="c{{ loop.index }}"></span></div>
+          <div class="rank-sub">{{ p['units'] }} unit{{ '' if p['units'] == 1 else 's' }} sold</div>
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <div class="empty"><strong>Nothing sold yet</strong>Best sellers show up here.</div>
+      {% endif %}
+    </section>
+  </div>
+
+  {# ---------- Recent invoices + low stock ---------- #}
+  <div class="dash-grid">
+    <section class="panel" aria-labelledby="recent-heading">
+      <div class="panel-head">
+        <h2 id="recent-heading">Recent invoices</h2>
+        {% if recent %}<a href="{{ url_for('invoice_history') }}" class="button button-ghost button-sm">View all</a>{% endif %}
+      </div>
+      {% if recent %}
+      <table>
+        <thead>
+          <tr><th scope="col">#</th><th scope="col">Customer</th><th scope="col">Date</th><th scope="col">Total</th></tr>
+        </thead>
+        <tbody>
+          {% for inv in recent %}
+          <tr {% if inv['status'] == 'cancelled' %}class="is-cancelled"{% endif %}>
+            <td data-label="#" class="mono"><a href="{{ url_for('view_invoice', invoice_id=inv['id']) }}">{{ inv['id'] }}</a></td>
+            {% set st = payment_status(inv) %}{% set lbl = PAYMENT_STATUS_LABELS[st] %}
+            <td data-label="Customer">
+              <span>{{ inv['customer'] }} {% if st != 'paid' %}<span class="badge {{ lbl[1] }}">{{ lbl[0] }}</span>{% endif %}</span>
+            </td>
+            <td data-label="Date">{{ inv['date'] | nicedate }}</td>
+            <td data-label="Total">{{ inv['total_cents'] | money(inv['currency']) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty">
+        <strong>No invoices yet</strong>
+        {% if stats.products %}<a class="button" href="{{ url_for('new_invoice') }}">Create your first invoice</a>
+        {% else %}Add a product first, then bill your first customer.{% endif %}
+      </div>
+      {% endif %}
+    </section>
+
+    <div style="display:grid; gap: var(--space-4); align-content:start;">
+    <section class="panel" aria-labelledby="owe-heading" style="margin:0;">
+      <div class="panel-head">
+        <h2 id="owe-heading">Who owes you</h2>
+        {% if debtors %}<a href="{{ url_for('invoice_history') }}" class="button button-ghost button-sm">See all</a>{% endif %}
+      </div>
+      {% if debtors %}
+      <ul class="debtors">
+        {% for d in debtors %}
+        <li>
+          {% set parts = (d['customer'] or '?').split() %}
+          <span class="initials {{ 'warm' if d['oldest_due'] and d['oldest_due'] < today else 'alt' }}" aria-hidden="true">{{ (parts[0][:1] ~ (parts[1][:1] if parts | length > 1 else '')) | upper }}</span>
+          <div class="who">
+            {% if d['customer_id'] %}<a href="{{ url_for('customer_detail', customer_id=d['customer_id']) }}">{{ d['customer'] }}</a>{% else %}{{ d['customer'] }}{% endif %}
+            <span>{{ d['invoice_count'] }} invoice{{ '' if d['invoice_count'] == 1 else 's' }}{% if d['oldest_due'] and d['oldest_due'] < today %} · <b class="late">overdue</b>{% endif %}</span>
+          </div>
+          <b class="amt">{{ d['owed_cents'] | money }}</b>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty"><strong>Nobody owes you</strong>Unpaid invoices will show here.</div>
+      {% endif %}
+    </section>
+
+    <section class="panel" aria-labelledby="low-heading" style="margin:0;">
+      <div class="panel-head">
+        <h2 id="low-heading">Running low</h2>
+        {% if low %}<a href="{{ url_for('products_page') }}" class="button button-ghost button-sm">Restock</a>{% endif %}
+      </div>
+      {% if low %}
+      <ul class="stock-list">
+        {% for p in low %}
+        {% set pct = [(p['stock'] / (p['low_stock_threshold'] or 1) * 100) | round, 100] | min %}
+        <li>
+          <div class="rank-row">
+            <span class="rank-name">{{ p['name'] }}</span>
+            {% if p['stock'] == 0 %}<span class="badge badge-danger">Out</span>
+            {% else %}<span class="stock-count">{{ p['stock'] }} left</span>{% endif %}
+          </div>
+          <div class="rank-bar warn"><span style="width: {{ pct }}%"></span></div>
+          <div class="rank-sub">Alert at {{ p['low_stock_threshold'] }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty"><strong>All stocked up</strong>Nothing is below its alert level.</div>
+      {% endif %}
+    </section>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var h = new Date().getHours(), el = document.getElementById("greet");
+    if (el) el.textContent = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Team — Invoice Generator{% endblock %}
+{% block content %}
+  <div class="page-hero">
+    <div>
+      <div class="eyebrow">Owner</div>
+      <h1>Team</h1>
+      <p>Give teammates their own login, so every invoice shows who made it.</p>
+    </div>
+    <div class="summary" style="margin:0; min-width: 300px;">
+      <div class="is-blue"><div class="s-label">People</div><div class="s-value">{{ workers | length }}</div></div>
+      <div class="{{ '' if passcode_is_set else 'is-orange' }}"><div class="s-label">Passcode</div><div class="s-value" style="font-size:1.05rem;">{{ 'Set' if passcode_is_set else 'Not set' }}</div></div>
+    </div>
+  </div>
+
+  {% if not passcode_is_set %}
+  <div class="hint" role="status">
+    <span class="hint-icon" aria-hidden="true">!</span>
+    <p><strong>Set a company passcode first.</strong> Teammates can't log in until one exists. It's on the right.</p>
+  </div>
+  {% else %}
+  <div class="hint" data-hint="team" hidden>
+    <span class="hint-icon" aria-hidden="true">i</span>
+    <p><strong>How teammates log in:</strong> they open <em>Team member</em> on the login page and enter your company name, the passcode, and the email + password you set for them.</p>
+    <button type="button" class="button-ghost button-sm hint-dismiss" data-hint-dismiss>Got it</button>
+  </div>
+  {% endif %}
+
+  <div class="split">
+    <section aria-labelledby="team-heading">
+      <h2 id="team-heading" style="margin-bottom: var(--space-3);">People</h2>
+      <div class="people">
+        {% for w in workers %}
+        <div class="person">
+          <span class="initials {{ 'warm' if w['role'] == 'owner' else 'alt' }}" aria-hidden="true">{{ w['email'][:1] | upper }}</span>
+          <div class="who">
+            <b>{{ w["email"] }}</b>
+            <span>{% if w["id"] == session.get("user_id") %}That's you · {% endif %}{% if w["role"] == "owner" %}Resets their own password with "Forgot password"{% else %}Logs in with the company passcode{% endif %}</span>
+          </div>
+          <span class="role-tag {{ w['role'] }}">{{ w["role"] }}</span>
+          {% if w["role"] == "worker" %}
+          <details>
+            <summary class="button button-secondary button-sm">Reset password</summary>
+            <form action="{{ url_for('reset_teammate_password', user_id=w['id']) }}" method="POST">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="password" name="password" minlength="8" placeholder="New password" aria-label="New password for {{ w['email'] }}" autocomplete="new-password" required />
+              <input type="password" name="confirm_password" minlength="8" placeholder="Confirm" aria-label="Confirm new password" autocomplete="new-password" required />
+              <button type="submit" class="button-sm">Save</button>
+            </form>
+          </details>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% if workers | length < 2 %}
+      <div class="empty" style="margin-top: var(--space-3);"><strong>Just you so far</strong>Add your first teammate with the form.</div>
+      {% endif %}
+    </section>
+
+    <aside>
+      <section class="panel panel-navy panel-compact" aria-labelledby="add-teammate-heading">
+        <h2 id="add-teammate-heading">Add a teammate</h2>
+        <form action="{{ url_for('add_teammate') }}" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label for="teammate-email">Their email (their username)</label>
+          <input id="teammate-email" type="email" name="email" autocomplete="off" required />
+          <label for="teammate-password">Starting password</label>
+          <input id="teammate-password" type="password" name="password" minlength="8" autocomplete="new-password" required />
+          <label for="teammate-confirm">Confirm password</label>
+          <input id="teammate-confirm" type="password" name="confirm_password" minlength="8" autocomplete="new-password" required />
+          <p class="form-help">Share it with them in person or by phone.</p>
+          <div class="form-actions"><button type="submit" {% if not passcode_is_set %}disabled title="Set a company passcode first"{% endif %}>Add teammate</button></div>
+        </form>
+      </section>
+
+      <section class="panel panel-compact" aria-labelledby="passcode-heading">
+        <h2 id="passcode-heading">Company passcode</h2>
+        <p class="muted" style="font-size:13.5px;">
+          {% if passcode_is_set %}Changing it stops the old one working immediately, so tell your team straight away.
+          {% else %}Your team needs this, plus their own email and password, to log in.{% endif %}
+        </p>
+        <form action="{{ url_for('change_company_passcode') }}" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label for="company-passcode">{{ "New passcode" if passcode_is_set else "Passcode" }}</label>
+          <input id="company-passcode" type="password" name="company_passcode" minlength="8" autocomplete="off" required />
+          <label for="company-passcode-confirm">Confirm passcode</label>
+          <input id="company-passcode-confirm" type="password" name="confirm_company_passcode" minlength="8" autocomplete="off" required />
+          <div class="form-actions"><button type="submit" class="{{ 'button-secondary' if passcode_is_set else 'button-orange' }}">{{ "Change passcode" if passcode_is_set else "Set passcode" }}</button></div>
+        </form>
+      </section>
+    </aside>
+  </div>
+{% endblock %}

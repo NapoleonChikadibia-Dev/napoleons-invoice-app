@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Create invoices, track stock and manage your team in one simple app. Built for small shops and service businesses." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <title>Invoice Generator — invoices and stock for small businesses</title>
+</head>
+<body class="landing">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-messages" role="status" aria-live="polite">
+        {% for category, message in messages %}<p class="flash {{ category }}">{{ message }}</p>{% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- ===== Top nav ===== -->
+  <header class="l-nav">
+    <div class="l-wrap l-nav-inner">
+      <a class="brand" href="{{ url_for('home') }}">Invoice Generator</a>
+      <nav class="l-links" aria-label="Page sections">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+      </nav>
+      <div class="l-nav-cta">
+        <a class="l-login" href="{{ url_for('login') }}">Log in</a>
+        <a class="button" href="{{ url_for('signup') }}">Get started</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== Hero ===== -->
+  <section class="l-hero">
+    <div class="l-wrap l-hero-grid">
+      <div class="l-hero-copy" data-reveal>
+        <span class="l-pill"><i class="ri-flashlight-fill" aria-hidden="true"></i> Invoices, stock &amp; team in one place</span>
+        <h1>Bill customers in seconds.
+          <span class="type-wrap">
+            <span class="visually-hidden">Never lose track of stock.</span>
+            <span class="type-ghost" aria-hidden="true">Never lose track of stock.</span>
+            <span class="type-live" aria-hidden="true" data-type="Never lose track of stock."><span class="type-text">Never lose track of stock.</span><span class="caret"></span></span>
+          </span>
+        </h1>
+        <p class="l-lead">Create a professional invoice, email it to your customer, and watch your stock update on its own. Built for small shops and service businesses tired of paper receipt books.</p>
+        <div class="l-hero-cta">
+          <a class="button button-orange l-big" href="{{ url_for('signup') }}">Create your free account <i class="ri-arrow-right-line l-arrow" aria-hidden="true"></i></a>
+          <a class="button button-secondary l-big" href="#how">See how it works</a>
+        </div>
+        <ul class="l-ticks">
+          <li><i class="ri-check-line" aria-hidden="true"></i> Free to start</li>
+          <li><i class="ri-check-line" aria-hidden="true"></i> Works on your phone</li>
+          <li><i class="ri-check-line" aria-hidden="true"></i> ₦, $, £, € and more</li>
+        </ul>
+      </div>
+
+      <!-- Product preview (illustration built in HTML, not a real account) -->
+      <div class="l-preview" aria-hidden="true" data-reveal>
+        <div class="l-card l-invoice">
+          <div class="l-inv-band">
+            <div><span class="l-lbl">Invoice</span><b class="mono">#00042</b></div>
+            <div class="l-inv-from">Your Business<span>29 Sep 2026</span></div>
+          </div>
+          <div class="l-inv-body">
+            <div class="l-row"><span>50kg bag of rice × 2</span><b>₦170,000.00</b></div>
+            <div class="l-row"><span>Groundnut oil (5L) × 3</span><b>₦43,500.00</b></div>
+            <div class="l-row"><span>Tomato paste × 1</span><b>₦22,000.00</b></div>
+            <div class="l-total"><span>Total due</span><b>₦235,500.00</b></div>
+          </div>
+        </div>
+        <div class="l-card l-float l-float-a">
+          <span class="l-dot is-green"></span>
+          <div><b>Invoice emailed</b><span>to your customer</span></div>
+        </div>
+        <div class="l-card l-float l-float-b">
+          <span class="l-dot is-orange"></span>
+          <div><b>Groundnut oil</b><span>3 left, time to restock</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Features ===== -->
+  <section class="l-section" id="features">
+    <div class="l-wrap">
+      <div class="l-head" data-reveal>
+        <span class="l-eyebrow">Features</span>
+        <h2>Everything a small business needs to get paid</h2>
+        <p>No accounting jargon. Just the tools you use every day.</p>
+      </div>
+      <div class="l-features">
+        <article class="l-feature" data-reveal>
+          <span class="l-icon"><i class="ri-file-list-3-line" aria-hidden="true"></i></span>
+          <h3>Invoices in 30 seconds</h3>
+          <p>Pick a customer, add products, done. A live preview shows exactly what they'll receive.</p>
+        </article>
+        <article class="l-feature" data-reveal>
+          <span class="l-icon"><i class="ri-whatsapp-line" aria-hidden="true"></i></span>
+          <h3>Send on WhatsApp</h3>
+          <p>One tap sends your customer a link to their invoice, with your bank details. They can save it as a PDF.</p>
+        </article>
+        <article class="l-feature" data-reveal>
+          <span class="l-icon is-orange"><i class="ri-box-3-line" aria-hidden="true"></i></span>
+          <h3>Stock that updates itself</h3>
+          <p>Every sale reduces stock, and you get a warning before anything runs out. No more counting by hand.</p>
+        </article>
+        <article class="l-feature" data-reveal>
+          <span class="l-icon is-orange"><i class="ri-hand-coin-line" aria-hidden="true"></i></span>
+          <h3>Know who owes you</h3>
+          <p>Record full or part payments and see every customer who still owes you, and what's overdue.</p>
+        </article>
+        <article class="l-feature" data-reveal>
+          <span class="l-icon"><i class="ri-team-line" aria-hidden="true"></i></span>
+          <h3>Logins for your staff</h3>
+          <p>Each teammate gets their own login, so you always know who made which sale.</p>
+        </article>
+        <article class="l-feature" data-reveal>
+          <span class="l-icon"><i class="ri-line-chart-line" aria-hidden="true"></i></span>
+          <h3>See your real profit</h3>
+          <p>Add what you paid for each product and the dashboard shows what you actually made this month.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== How it works ===== -->
+  <section class="l-section l-how" id="how">
+    <div class="l-wrap">
+      <div class="l-head" data-reveal>
+        <span class="l-eyebrow">How it works</span>
+        <h2>Up and running in three steps</h2>
+      </div>
+      <ol class="l-steps">
+        <li data-reveal>
+          <span class="l-num">1</span>
+          <h3>Create your account</h3>
+          <p>Business name, email and a password. Takes about 20 seconds.</p>
+        </li>
+        <li data-reveal>
+          <span class="l-num">2</span>
+          <h3>Add your products</h3>
+          <p>Name, price and how many you have. A checklist guides you through it.</p>
+        </li>
+        <li data-reveal>
+          <span class="l-num">3</span>
+          <h3>Send your first invoice</h3>
+          <p>Bill a customer and watch your stock and dashboard update.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ===== Final call to action ===== -->
+  <section class="l-cta">
+    <div class="l-wrap l-cta-inner" data-reveal>
+      <div>
+        <h2>Ready to leave the receipt book behind?</h2>
+        <p>Set up your business in a minute. Your team can join whenever you're ready.</p>
+      </div>
+      <div class="l-hero-cta">
+        <a class="button button-orange l-big l-bounce" href="{{ url_for('signup') }}">Get started free</a>
+        <a class="button l-ghost l-big" href="{{ url_for('login') }}">I already have an account</a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="l-footer">
+    <div class="l-wrap l-foot-inner">
+      <a class="brand" href="{{ url_for('home') }}">Invoice Generator</a>
+      <nav aria-label="Footer">
+        <a href="{{ url_for('login') }}">Owner login</a>
+        <a href="{{ url_for('worker_login') }}">Team login</a>
+        <a href="{{ url_for('signup') }}">Sign up</a>
+      </nav>
+      <p>© 2026 Invoice Generator</p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      /* Scroll reveal: things fade up as they come into view. Content is
+         fully visible without JavaScript; the hidden state is only added here. */
+      var items = document.querySelectorAll("[data-reveal]");
+      if (!reduce && "IntersectionObserver" in window) {
+        items.forEach(function (el) {
+          el.classList.add("reveal");
+          var sibs = Array.prototype.filter.call(el.parentNode.children, function (c) { return c.hasAttribute("data-reveal"); });
+          el.style.transitionDelay = Math.min(sibs.indexOf(el), 5) * 90 + "ms";
+        });
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+          });
+        }, { threshold: 0.15, rootMargin: "0px 0px -40px 0px" });
+        items.forEach(function (el) { io.observe(el); });
+      }
+
+      /* Typing headline: types, holds, deletes, types again. */
+      var live = document.querySelector(".type-live");
+      if (!live || reduce) return;
+      var out = live.querySelector(".type-text"), full = live.getAttribute("data-type");
+      var i = 0, deleting = false;
+      out.textContent = "";
+      function tick() {
+        if (!deleting) {
+          i++; out.textContent = full.slice(0, i);
+          if (i === full.length) { deleting = true; return setTimeout(tick, 4000); }
+          return setTimeout(tick, 70 + Math.random() * 60);
+        }
+        i--; out.textContent = full.slice(0, i);
+        if (i === 0) { deleting = false; return setTimeout(tick, 500); }
+        setTimeout(tick, 35);
+      }
+      setTimeout(tick, 600);
+    })();
+  </script>
+</body>
+</html>

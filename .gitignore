@@ -1,0 +1,9 @@
+venv/
+.venv/
+.env
+inventory.db
+*.db
+__pycache__/
+*.pyc
+.pytest_cache/
+static/uploads/

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>{% block title %}Invoice Generator{% endblock %} — Invoice Generator</title>
+</head>
+<body class="auth-body">
+    {% if false %}{% block auth_image %}login.png{% endblock %}{% endif %}
+    <section class="login">
+        <div class="login_content">
+            <div>
+                <a class="brand auth-brand" href="{{ url_for('home') }}">Invoice Generator</a>
+
+                {% block heading %}{% endblock %}
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                    <div class="flash-messages" role="alert">
+                      {% for category, message in messages %}
+                        <p class="flash {{ category }}">{{ message }}</p>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+
+            {# Side-panel photo. Pages can swap it with {% block auth_image %}. If the
+               file is missing, the panel falls back to the plain blue gradient. #}
+            <aside class="login_image has-photo" aria-label="About Invoice Generator"
+                   style="--auth-img: url('{{ url_for('static', filename=self.auth_image() | trim) }}');">
+                <div class="auth-aside">
+                    {% block aside %}
+                    <h3>Invoices, stock and your team in one place.</h3>
+                    <p>Built for small shops and service businesses that are tired of paper receipt books.</p>
+                    <ol>
+                        <li><div><strong>Add your products</strong>Prices and stock levels.</div></li>
+                        <li><div><strong>Bill a customer</strong>Stock updates on its own.</div></li>
+                        <li><div><strong>Print or email it</strong>Done in under a minute.</div></li>
+                    </ol>
+                    {% endblock %}
+                </div>
+            </aside>
+        </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.1/dist/gsap.min.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="{{ url_for('static', filename='auth.js') }}"></script>
+</body>
+</html>

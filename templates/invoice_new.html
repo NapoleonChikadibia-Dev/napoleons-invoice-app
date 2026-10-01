@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}New invoice — Invoice Generator{% endblock %}
+{% block content %}
+  <div class="page-hero">
+    <div>
+      <div class="eyebrow">Billing</div>
+      <h1>New invoice</h1>
+      <p>Pick who you're billing, add what they bought, and check the receipt on the right.</p>
+    </div>
+  </div>
+
+  {% if not products %}
+  <div class="empty">
+    <strong>Add a product first</strong>
+    Invoices are built from your product list, and it's empty right now.
+    <br /><a class="button" href="{{ url_for('products_page') }}">Add a product</a>
+  </div>
+  {% else %}
+
+  <div class="hint" data-hint="new-invoice" hidden>
+    <span class="hint-icon" aria-hidden="true">i</span>
+    <p><strong>Two quick steps:</strong> choose a customer (or add a new one), then pick products and quantities. The receipt updates as you go.</p>
+    <button type="button" class="button-ghost button-sm hint-dismiss" data-hint-dismiss>Got it</button>
+  </div>
+
+  <form action="/invoice/create" method="POST" id="invoice-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="split">
+      <div>
+        <section class="panel" aria-labelledby="step-customer">
+          <h2 id="step-customer" class="step-title"><span class="step-num">1</span> Who are you billing?</h2>
+          <label for="customer-select" class="visually-hidden">Customer</label>
+          <select id="customer-select" name="customer_id" required>
+            <option value="" disabled {% if customers %}selected{% endif %}>Choose a customer</option>
+            {% for c in customers %}
+            <option value="{{ c['id'] }}" data-name="{{ c['name'] }}">{{ c['name'] }}{% if c['phone'] or c['email'] %} — {{ c['phone'] or c['email'] }}{% endif %}</option>
+            {% endfor %}
+            <option value="__new__" {% if not customers %}selected{% endif %}>+ Add a new customer</option>
+          </select>
+
+          <div id="new-customer-fields" {% if customers %}hidden{% endif %}>
+            <div class="form-grid">
+              <div>
+                <label for="new-customer-name">Name</label>
+                <input id="new-customer-name" type="text" name="new_customer_name" autocomplete="off" />
+              </div>
+              <div>
+                <label for="new-customer-email">Email <span class="muted">(optional)</span></label>
+                <input id="new-customer-email" type="email" name="new_customer_email" autocomplete="off" />
+              </div>
+              <div>
+                <label for="new-customer-phone">Phone / WhatsApp</label>
+                <input id="new-customer-phone" type="tel" name="new_customer_phone" autocomplete="off" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="step-items">
+          <h2 id="step-items" class="step-title"><span class="step-num">2</span> What did they buy?</h2>
+          <div id="invoice-lines">
+            <div class="invoice-line">
+              <label>Product
+                <select name="product_id" required>
+                  <option value="" disabled selected>Choose a product</option>
+                  {% for p in products %}{{ product_option(p) }}{% endfor %}
+                </select>
+              </label>
+              <label>Quantity
+                <input type="number" name="quantity" min="1" value="1" required />
+              </label>
+              <span></span>
+            </div>
+          </div>
+          <button type="button" class="button-secondary" id="add-line"><i class="ri-add-line" aria-hidden="true"></i> Add another product</button>
+        </section>
+      </div>
+
+      <aside>
+        <div class="receipt" aria-live="polite">
+          <div class="receipt-head">
+            <div class="eyebrow">Invoice preview</div>
+            <div class="to" id="receipt-to">No customer yet</div>
+          </div>
+          <div class="receipt-body">
+            <ul class="receipt-lines" id="receipt-lines"><li class="empty-line">Pick a product to start</li></ul>
+            <div class="receipt-total">
+              <span class="muted">Total</span>
+              <strong id="running-total" data-sample="{{ 100 | money }}">{{ 0 | money }}</strong>
+            </div>
+          </div>
+          <div class="receipt-pay">
+            <div class="pay-label">Did they pay?</div>
+            <div class="seg" role="radiogroup" aria-label="Payment">
+              <label><input type="radio" name="paid_now" value="full" checked><span>Paid in full</span></label>
+              <label><input type="radio" name="paid_now" value="part"><span>Part</span></label>
+              <label><input type="radio" name="paid_now" value="none"><span>Not yet</span></label>
+            </div>
+            <div class="pay-row" id="pay-method-row">
+              <label for="pay-method" class="visually-hidden">Payment method</label>
+              <select name="pay_method" id="pay-method">
+                {% for key, label in PAYMENT_METHODS.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+              </select>
+              <input type="text" inputmode="decimal" name="paid_amount" id="paid-amount" placeholder="Amount paid" hidden aria-label="Amount paid now">
+            </div>
+            <div class="pay-row" id="due-row" hidden>
+              <label for="due-in" class="pay-sub">Balance due</label>
+              <select name="due_in_days" id="due-in">
+                <option value="0">Today</option>
+                <option value="7" selected>In 7 days</option>
+                <option value="14">In 14 days</option>
+                <option value="30">In 30 days</option>
+              </select>
+            </div>
+          </div>
+          <div class="receipt-foot">
+            <button type="submit"><i class="ri-check-line" aria-hidden="true"></i> Create invoice</button>
+            {% if smtp_configured %}
+            <p class="form-help">It's emailed to the customer as soon as it's created.</p>
+            {% else %}
+            <p class="form-help">Email isn't set up, so print or save it as a PDF after creating.</p>
+            {% endif %}
+          </div>
+        </div>
+      </aside>
+    </div>
+  </form>
+
+  <template id="line-template">
+    <div class="invoice-line">
+      <label>Product
+        <select name="product_id" required>
+          <option value="" disabled selected>Choose a product</option>
+          {% for p in products %}{{ product_option(p) }}{% endfor %}
+        </select>
+      </label>
+      <label>Quantity
+        <input type="number" name="quantity" min="1" value="1" required />
+      </label>
+      <button type="button" class="button-ghost" data-remove-line aria-label="Remove this product line">Remove</button>
+    </div>
+  </template>
+  {% endif %}
+{% endblock %}
+
+{% macro product_option(p) -%}
+  {%- set stock = p['stock'] if p['stock'] is defined else none -%}
+  <option value="{{ p['id'] }}" data-cents="{{ p['price_cents'] }}" data-name="{{ p['name'] }}"{% if stock is not none and stock <= 0 %} disabled{% endif %}>
+    {{ p['name'] }} — {{ p['price_cents']|money }}{% if stock is not none %} ({{ 'out of stock' if stock <= 0 else stock ~ ' in stock' }}){% endif %}
+  </option>
+{%- endmacro %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var form = document.getElementById("invoice-form");
+    if (!form) return;
+    var lines = document.getElementById("invoice-lines");
+    var totalEl = document.getElementById("running-total");
+    var receipt = document.getElementById("receipt-lines");
+    var toEl = document.getElementById("receipt-to");
+    var sample = totalEl.dataset.sample || "1.00";
+    var prefix = sample.slice(0, sample.search(/\d/));
+    var suffix = sample.slice(sample.search(/\d[^\d]*$/) + 1);
+    function fmt(cents) {
+      return prefix + (cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + suffix;
+    }
+
+    function recalc() {
+      var cents = 0, items = [];
+      lines.querySelectorAll(".invoice-line").forEach(function (row) {
+        var opt = row.querySelector("select").selectedOptions[0];
+        var qty = parseInt(row.querySelector("input").value, 10) || 0;
+        if (opt && opt.dataset.cents && qty > 0) {
+          var amt = parseInt(opt.dataset.cents, 10) * qty;
+          cents += amt;
+          items.push([opt.dataset.name + " × " + qty, fmt(amt)]);
+        }
+      });
+      receipt.innerHTML = "";
+      if (!items.length) {
+        var li = document.createElement("li"); li.className = "empty-line"; li.textContent = "Pick a product to start"; receipt.appendChild(li);
+      }
+      items.forEach(function (it) {
+        var li = document.createElement("li");
+        var a = document.createElement("span"); a.textContent = it[0];
+        var b = document.createElement("span"); b.textContent = it[1];
+        li.appendChild(a); li.appendChild(b); receipt.appendChild(li);
+      });
+      totalEl.textContent = fmt(cents);
+    }
+
+    document.getElementById("add-line").addEventListener("click", function () {
+      var clone = document.getElementById("line-template").content.cloneNode(true);
+      lines.appendChild(clone);
+      lines.lastElementChild.querySelector("select").focus();
+    });
+    lines.addEventListener("click", function (e) {
+      if (e.target.matches("[data-remove-line]")) { e.target.closest(".invoice-line").remove(); recalc(); }
+    });
+    lines.addEventListener("input", recalc);
+    lines.addEventListener("change", recalc);
+
+    var sel = document.getElementById("customer-select");
+    var box = document.getElementById("new-customer-fields");
+    var newName = document.getElementById("new-customer-name");
+    function updateTo() {
+      if (sel.value === "__new__") toEl.textContent = newName.value.trim() || "New customer";
+      else if (sel.selectedOptions[0] && sel.selectedOptions[0].dataset.name) toEl.textContent = sel.selectedOptions[0].dataset.name;
+      else toEl.textContent = "No customer yet";
+    }
+    function toggleNew() {
+      var isNew = sel.value === "__new__";
+      box.hidden = !isNew;
+      newName.required = isNew;
+      updateTo();
+    }
+    sel.addEventListener("change", function () { toggleNew(); if (sel.value === "__new__") newName.focus(); });
+    newName.addEventListener("input", updateTo);
+    toggleNew();
+    recalc();
+
+    // Payment choice: full / part / not yet
+    var amount = document.getElementById("paid-amount");
+    var methodRow = document.getElementById("pay-method-row");
+    var dueRow = document.getElementById("due-row");
+    function payChoice() {
+      var v = form.querySelector("input[name=paid_now]:checked").value;
+      amount.hidden = v !== "part"; amount.required = v === "part";
+      methodRow.hidden = v === "none";
+      dueRow.hidden = v === "full";
+      if (v === "part") amount.focus();
+    }
+    form.querySelectorAll("input[name=paid_now]").forEach(function (r) { r.addEventListener("change", payChoice); });
+    payChoice();
+
+    // Catch an impossible part payment before submitting, so nothing typed is lost.
+    function currentTotalCents() {
+      var cents = 0;
+      lines.querySelectorAll(".invoice-line").forEach(function (row) {
+        var opt = row.querySelector("select").selectedOptions[0];
+        var qty = parseInt(row.querySelector("input").value, 10) || 0;
+        if (opt && opt.dataset.cents) cents += parseInt(opt.dataset.cents, 10) * qty;
+      });
+      return cents;
+    }
+    function checkPart() {
+      amount.setCustomValidity("");
+      if (amount.hidden) return;
+      var v = Math.round(parseFloat((amount.value || "").replace(/,/g, "")) * 100);
+      var total = currentTotalCents();
+      if (!(v > 0)) amount.setCustomValidity("Enter how much they paid now.");
+      else if (total && v >= total) amount.setCustomValidity("That's the full amount or more. Choose \"Paid in full\" instead, or enter less than " + totalEl.textContent + ".");
+    }
+    amount.addEventListener("input", checkPart);
+    form.addEventListener("submit", function (e) { checkPart(); if (!amount.checkValidity()) { e.preventDefault(); amount.reportValidity(); } });
+  })();
+</script>
+{% endblock %}

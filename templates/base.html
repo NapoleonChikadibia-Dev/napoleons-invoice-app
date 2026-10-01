@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <title>{% block title %}Invoice Generator{% endblock %}</title>
+  </head>
+  {% set ep = request.endpoint %}
+  {% set is_owner = session.get('role') == 'owner' %}
+  {% macro nav_item(endpoint, label, icon, tour, also=()) -%}
+    {%- set on = ep == endpoint or ep in also -%}
+    <a href="{{ url_for(endpoint) }}" data-tour="{{ tour }}" class="side-link{% if on %} active{% endif %}"{% if on %} aria-current="page"{% endif %}>
+      <i class="{{ icon }}" aria-hidden="true"></i><span>{{ label }}</span>
+    </a>
+  {%- endmacro %}
+  <body class="{% if session.get('user_id') %}has-sidebar{% endif %}"
+        data-user="{{ session.get('user_id', '') }}"
+        data-role="{{ session.get('role', '') }}"
+        data-page="{{ ep or '' }}"
+        {% if first_run %}data-first-run="true"{% endif %}>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-messages" role="status" aria-live="polite">
+          {% for category, message in messages %}
+            <p class="flash {{ category }}">{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% if session.get('user_id') %}
+    <aside class="sidebar no-print" id="nav-links" aria-label="Main navigation">
+      <a class="brand" href="{{ url_for('home') }}">Invoice Generator</a>
+
+      <a href="{{ url_for('new_invoice') }}" data-tour="new-invoice" class="side-cta{% if ep == 'new_invoice' %} active{% endif %}">
+        <i class="ri-add-line" aria-hidden="true"></i><span>New invoice</span>
+      </a>
+
+      <nav class="side-group">
+        <div class="side-label">Workspace</div>
+        {{ nav_item('home', 'Dashboard', 'ri-dashboard-3-line', 'dashboard') }}
+        {{ nav_item('invoice_history', 'Invoices', 'ri-file-list-3-line', 'history', ('view_invoice',)) }}
+        {{ nav_item('customers_page', 'Customers', 'ri-group-line', 'customers', ('customer_detail',)) }}
+        {{ nav_item('products_page', 'Products', 'ri-box-3-line', 'products') }}
+        {{ nav_item('low_stock', 'Low stock', 'ri-alarm-warning-line', 'low-stock') }}
+      </nav>
+
+      {% if is_owner %}
+      <nav class="side-group">
+        <div class="side-label">Owner</div>
+        {{ nav_item('reports', 'Reports', 'ri-bar-chart-2-line', 'reports') }}
+        {{ nav_item('team_page', 'Team', 'ri-team-line', 'team') }}
+        {{ nav_item('settings_page', 'Settings', 'ri-settings-3-line', 'settings') }}
+      </nav>
+      {% endif %}
+
+      <div class="side-foot">
+        <a href="{{ url_for('home', tour=1) }}" class="side-link" data-tour="help" data-tour-start>
+          <i class="ri-question-line" aria-hidden="true"></i><span>Replay the tour</span>
+        </a>
+        <div class="side-user">
+          <span class="avatar" aria-hidden="true">{{ (session.get('company_name') or 'C')[:1] | upper }}</span>
+          <div class="side-user-text">
+            <strong>{{ session.get('company_name', '') }}</strong>
+            <span>{{ session.get('username', '') }}</span>
+          </div>
+          <form action="{{ url_for('logout') }}" method="POST" class="nav-logout-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="side-logout" aria-label="Log out" title="Log out"><i class="ri-logout-box-r-line" aria-hidden="true"></i></button>
+          </form>
+        </div>
+      </div>
+    </aside>
+
+    <div class="topbar no-print">
+      <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <a class="brand" href="{{ url_for('home') }}">Invoice Generator</a>
+      <a class="button button-sm" href="{{ url_for('new_invoice') }}">+ New</a>
+    </div>
+    <div class="scrim no-print" id="nav-scrim" hidden></div>
+    {% endif %}
+
+    <div class="app-main">
+      {% if session.get('user_id') and not email_verified %}
+      <div class="verify-banner no-print" role="status">
+        <i class="ri-mail-check-line" aria-hidden="true"></i>
+        <span>Please verify <strong>{{ session.get('username') }}</strong>. We sent you a link. It lets you reset your password if you ever forget it.</span>
+        <form action="{{ url_for('resend_verification') }}" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="email" value="{{ session.get('username') }}">
+          <button type="submit" class="button-ghost button-sm">Resend link</button>
+        </form>
+      </div>
+      {% endif %}
+      <main{% block main_class %}{% endblock %}>
+        {% block content %}{% endblock %}
+      </main>
+      <footer class="no-print"><p>© 2026 Invoice Generator</p></footer>
+    </div>
+
+    {% if session.get('user_id') %}
+    <script>
+      (function () {
+        var toggle = document.getElementById("nav-toggle");
+        var side = document.getElementById("nav-links");
+        var scrim = document.getElementById("nav-scrim");
+        if (!toggle || !side) return;
+        function set(open) {
+          side.classList.toggle("open", open);
+          scrim.hidden = !open;
+          toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+        toggle.addEventListener("click", function () { set(!side.classList.contains("open")); });
+        scrim.addEventListener("click", function () { set(false); });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && side.classList.contains("open")) set(false); });
+      })();
+      // <form data-confirm="..."> asks before submitting (safe with any product name).
+      document.addEventListener("submit", function (e) {
+        var msg = e.target.getAttribute && e.target.getAttribute("data-confirm");
+        if (msg && !window.confirm(msg)) e.preventDefault();
+      });
+      // Success/info toasts fade after a few seconds; errors stay until clicked.
+      setTimeout(function () {
+        document.querySelectorAll(".flash:not(.error):not(.danger):not(.warning)").forEach(function (f) { f.remove(); });
+      }, 6000);
+      document.addEventListener("click", function (e) {
+        if (e.target.classList && e.target.classList.contains("flash")) e.target.remove();
+      });
+    </script>
+    <script src="{{ url_for('static', filename='tour.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+    {% endif %}
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

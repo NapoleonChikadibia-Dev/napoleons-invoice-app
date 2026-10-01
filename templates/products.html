@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Products — Invoice Generator{% endblock %}
+{% block content %}
+  {% set out_n = namespace(v=0) %}{% set lowonly = namespace(v=0) %}
+  {% for p in products %}
+    {% if p['stock'] <= 0 %}{% set out_n.v = out_n.v + 1 %}
+    {% elif p['stock'] <= p['low_stock_threshold'] %}{% set lowonly.v = lowonly.v + 1 %}{% endif %}
+  {% endfor %}
+
+  <div class="page-hero">
+    <div>
+      <div class="eyebrow">Inventory</div>
+      <h1>Products</h1>
+      <p>Everything you sell. Stock drops automatically each time you invoice.</p>
+    </div>
+    {% if products %}
+    <div class="summary" style="margin:0; min-width: 300px;">
+      <div class="is-blue"><div class="s-label">Products</div><div class="s-value">{{ products | length }}</div></div>
+      <div class="is-orange"><div class="s-label">Need restock</div><div class="s-value">{{ out_n.v + lowonly.v }}</div></div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="hint" data-hint="products" hidden>
+    <span class="hint-icon" aria-hidden="true">i</span>
+    <p><strong>Start here.</strong> Add at least one product. You'll pick from this list when you create an invoice.</p>
+    <button type="button" class="button-ghost button-sm hint-dismiss" data-hint-dismiss>Got it</button>
+  </div>
+
+  <div class="split">
+    <div>
+      {% if products %}
+      <div class="toolbar">
+        <label class="search">
+          <i class="ri-search-line" aria-hidden="true"></i>
+          <span class="visually-hidden">Search products</span>
+          <input type="search" placeholder="Search products" data-search="product-list" />
+        </label>
+        <div class="chips" data-chips="product-list" role="group" aria-label="Filter products">
+          <button type="button" class="chip" data-chip="all" aria-pressed="true">All<span class="n">{{ products | length }}</span></button>
+          <button type="button" class="chip" data-chip="low" aria-pressed="false">Low<span class="n">{{ lowonly.v }}</span></button>
+          <button type="button" class="chip" data-chip="out" aria-pressed="false">Out<span class="n">{{ out_n.v }}</span></button>
+        </div>
+      </div>
+
+      <div class="card-grid" id="product-list">
+        {% for p in products %}
+        {% set out = p['stock'] <= 0 %}
+        {% set low = not out and p['stock'] <= p['low_stock_threshold'] %}
+        {% set cap = [p['low_stock_threshold'] * 3, p['stock'], 1] | max %}
+        <article class="p-card{% if out %} is-out{% elif low %} is-low{% endif %}"
+                 data-item data-text="{{ p['name'] | lower }}" data-state="{{ 'out' if out else ('low' if low else 'ok') }}">
+          <div class="p-top">
+            <div class="p-name">{{ p['name'] }}</div>
+            {% if out %}<span class="badge badge-danger">Out</span>{% elif low %}<span class="badge badge-warning">Low</span>{% endif %}
+          </div>
+          <div class="p-price">{{ p['price_cents'] | money }}</div>
+          {% if session.get('role') == 'owner' %}
+            {% if p['cost_cents'] is not none %}
+              {% set margin = p['price_cents'] - p['cost_cents'] %}
+              <div class="p-profit">Cost {{ p['cost_cents'] | money }} · profit <b class="{{ 'neg' if margin < 0 else '' }}">{{ margin | money }}</b> each{% if p['price_cents'] %} ({{ (margin / p['price_cents'] * 100) | round | int }}%){% endif %}</div>
+            {% else %}
+              <div class="p-profit">No cost price yet, so profit isn't counted</div>
+            {% endif %}
+          {% endif %}
+          <div>
+            <div class="meter" aria-hidden="true"><span style="width: {{ (p['stock'] / cap * 100) | round }}%"></span></div>
+            <div class="p-stock" style="margin-top:6px;">
+              <span>{{ p['stock'] }} in stock</span><span>Alert at {{ p['low_stock_threshold'] }}</span>
+            </div>
+          </div>
+          {% if session.get('role') == 'owner' %}
+          <details class="p-edit">
+            <summary class="button button-ghost button-sm"><i class="ri-edit-line" aria-hidden="true"></i> Edit name &amp; price</summary>
+            <form action="{{ url_for('edit_product', product_id=p['id']) }}" method="POST">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <label for="edit-name-{{ p['id'] }}">Name</label>
+              <input id="edit-name-{{ p['id'] }}" type="text" name="name" value="{{ p['name'] }}" required />
+              <label for="edit-price-{{ p['id'] }}">Price ({{ currencies[company_currency][0] }})</label>
+              <input id="edit-price-{{ p['id'] }}" type="number" step="0.01" min="0" name="price" value="{{ '%.2f' | format(p['price_cents'] / 100) }}" inputmode="decimal" required />
+              <label for="edit-cost-{{ p['id'] }}">Cost price <span class="muted">(what you paid)</span></label>
+              <input id="edit-cost-{{ p['id'] }}" type="number" step="0.01" min="0" name="cost" value="{{ ('%.2f' | format(p['cost_cents'] / 100)) if p['cost_cents'] is not none else '' }}" inputmode="decimal" />
+              <p class="p-edit-note">Past invoices keep the old name, price and cost.</p>
+              <button type="submit" class="button-sm">Save changes</button>
+            </form>
+          </details>
+          {% endif %}
+          <div class="p-actions">
+            <form action="/products/restock/{{ p['id'] }}" method="POST" class="restock">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="next" value="/products">
+              <label class="visually-hidden" for="restock-{{ p['id'] }}">Units to add for {{ p['name'] }}</label>
+              <input id="restock-{{ p['id'] }}" type="number" name="amount" min="1" placeholder="Qty" required />
+              <button type="submit" class="button-secondary button-sm">Restock</button>
+            </form>
+            {% if session.get('role') == 'owner' %}
+            <form action="/products/delete/{{ p['id'] }}" method="POST" data-confirm="Delete {{ p['name'] }}? This can't be undone.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="icon-btn" aria-label="Delete {{ p['name'] }}" title="Delete"><i class="ri-delete-bin-6-line" aria-hidden="true"></i></button>
+            </form>
+            {% endif %}
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      <div class="empty no-results" data-empty-for="product-list"><strong>No products match</strong>Try another search or filter.</div>
+      {% else %}
+      <div class="empty">
+        <strong>No products yet</strong>
+        Add your first one with the form on the right.
+      </div>
+      {% endif %}
+    </div>
+
+    <aside>
+      <section class="panel panel-navy panel-compact" aria-labelledby="add-product-heading">
+        <h2 id="add-product-heading">Add a product</h2>
+        <form action="/products/add" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label for="product-name">Product name</label>
+          <input id="product-name" type="text" name="name" placeholder="e.g. 50kg bag of rice" required {% if not products %}autofocus{% endif %} />
+          <label for="product-price">Price ({{ currencies[company_currency][0] }})</label>
+          <input id="product-price" type="number" step="0.01" min="0" name="price" placeholder="0.00" inputmode="decimal" required />
+          {% if session.get('role') == 'owner' %}
+          <label for="product-cost">Cost price ({{ currencies[company_currency][0] }}) <span style="opacity:.6;">optional, only you see it</span></label>
+          <input id="product-cost" type="number" step="0.01" min="0" name="cost" placeholder="What you paid for it" inputmode="decimal" />
+          {% endif %}
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+            <div>
+              <label for="product-stock">In stock</label>
+              <input id="product-stock" type="number" min="0" name="stock" placeholder="0" inputmode="numeric" required />
+            </div>
+            <div>
+              <label for="product-threshold">Alert at</label>
+              <input id="product-threshold" type="number" min="0" name="low_stock_threshold" value="5" inputmode="numeric" />
+            </div>
+          </div>
+          <div class="form-actions"><button type="submit"><i class="ri-add-line" aria-hidden="true"></i> Add product</button></div>
+        </form>
+      </section>
+    </aside>
+  </div>
+{% endblock %}

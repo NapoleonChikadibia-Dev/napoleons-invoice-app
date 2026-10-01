@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Settings — Invoice Generator{% endblock %}
+{% block content %}
+  <div class="page-hero">
+    <div>
+      <div class="eyebrow">Owner</div>
+      <h1>Settings</h1>
+      <p>Company-wide options. Only you, the owner, can change these.</p>
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="setting-row">
+      <div>
+        <h2 id="currency-heading">Currency</h2>
+        <p class="desc">Used for prices, new invoices, emails and the dashboard.</p>
+      </div>
+      <form action="{{ url_for('settings_page') }}" method="POST" aria-labelledby="currency-heading"
+            {% if invoice_count %}data-confirm="Change the currency? New invoices will use it. Your {{ invoice_count }} existing invoice{{ '' if invoice_count == 1 else 's' }} keep their original currency, and amounts are NOT converted."{% endif %}>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="currency">Your company bills in</label>
+        <select id="currency" name="currency" style="max-width: 420px;">
+          {% for code, (symbol, name) in currencies.items() %}
+          <option value="{{ code }}" data-symbol="{{ symbol }}" {% if code == company_currency %}selected{% endif %}>{{ symbol }} · {{ name }} ({{ code }})</option>
+          {% endfor %}
+        </select>
+        <div class="currency-preview" aria-live="polite">Prices will look like <b id="currency-sample">{{ 850000 | money }}</b></div>
+        {% if invoice_count %}
+        <p class="form-help">
+          <strong>Heads up:</strong> this only changes the symbol, it doesn't convert amounts.
+          Existing invoices keep the currency they were created in.
+        </p>
+        {% endif %}
+        <div class="form-actions"><button type="submit">Save currency</button></div>
+      </form>
+    </div>
+
+    <div class="setting-row" id="business">
+      <div>
+        <h2 id="biz-heading">Business details</h2>
+        <p class="desc">Shown at the top of every invoice and on the link your customers open. Bank details appear whenever money is still owed.</p>
+      </div>
+      <form action="{{ url_for('save_business_profile') }}" method="POST" enctype="multipart/form-data" aria-labelledby="biz-heading">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Logo</label>
+        <div class="logo-row">
+          <div class="logo-preview" id="logo-preview">
+            {% if company["logo_file"] %}<img src="{{ url_for('static', filename='uploads/logos/' ~ company['logo_file']) }}" alt="Current logo">
+            {% else %}<i class="ri-image-add-line" aria-hidden="true"></i>{% endif %}
+          </div>
+          <div style="display:grid; gap:6px;">
+            <input type="file" name="logo" id="logo" accept="image/png,image/jpeg,image/webp" aria-label="Upload logo">
+            <span class="muted" style="font-size:12.5px;">PNG, JPG or WEBP, under 2 MB. A square image looks best.</span>
+            {% if company["logo_file"] %}<label class="check-inline"><input type="checkbox" name="remove_logo" value="1"> Remove current logo</label>{% endif %}
+          </div>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label for="biz-phone">Phone / WhatsApp</label>
+            <input id="biz-phone" type="tel" name="phone" value="{{ company['phone'] }}" placeholder="0803 000 0000">
+          </div>
+          <div>
+            <label for="biz-email">Business email <span class="muted">(optional)</span></label>
+            <input id="biz-email" type="email" name="biz_email" value="{{ company['biz_email'] }}">
+          </div>
+        </div>
+        <label for="biz-address">Address</label>
+        <input id="biz-address" type="text" name="address" value="{{ company['address'] }}" placeholder="Shop 12, Mile 1 Market, Port Harcourt">
+        <div class="form-grid">
+          <div>
+            <label for="bank-name">Bank</label>
+            <input id="bank-name" type="text" name="bank_name" value="{{ company['bank_name'] }}" placeholder="e.g. GTBank">
+          </div>
+          <div>
+            <label for="acct-number">Account number</label>
+            <input id="acct-number" type="text" inputmode="numeric" name="account_number" value="{{ company['account_number'] }}" maxlength="20">
+          </div>
+        </div>
+        <label for="acct-name">Account name</label>
+        <input id="acct-name" type="text" name="account_name" value="{{ company['account_name'] }}">
+        <div class="form-actions"><button type="submit">Save business details</button></div>
+      </form>
+    </div>
+
+    <div class="setting-row">
+      <div>
+        <h2>Company</h2>
+        <p class="desc">Your team uses this name to log in.</p>
+      </div>
+      <div>
+        <div style="font-weight:800; font-size:1.1rem;">{{ session.get('company_name', '') }}</div>
+        <p class="muted" style="margin:4px 0 0; font-size:13.5px;">Manage teammates and the passcode on the <a href="{{ url_for('team_page') }}">Team page</a>.</p>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div>
+        <h2>Guided tour</h2>
+        <p class="desc">Walk through the app again.</p>
+      </div>
+      <div><a class="button button-secondary" href="{{ url_for('home', tour=1) }}">Replay the tour</a></div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var file = document.getElementById("logo"), box = document.getElementById("logo-preview");
+    if (file && box) file.addEventListener("change", function () {
+      var f = file.files[0]; if (!f) return;
+      var img = document.createElement("img"); img.alt = "New logo preview"; img.src = URL.createObjectURL(f);
+      box.innerHTML = ""; box.appendChild(img);
+    });
+  })();
+  (function () {
+    var sel = document.getElementById("currency"), out = document.getElementById("currency-sample");
+    if (!sel || !out) return;
+    var num = out.textContent.replace(/^[^\d]*/, "");
+    sel.addEventListener("change", function () { out.textContent = sel.selectedOptions[0].dataset.symbol + num; });
+  })();
+</script>
+{% endblock %}

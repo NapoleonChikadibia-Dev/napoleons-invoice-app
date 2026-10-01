@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Reports — Invoice Generator{% endblock %}
+{% block content %}
+  {# Bar lengths are compared only against rows in the same currency. #}
+  {% set peaks = {} %}
+  {% for row in monthly %}
+    {% if row['total_cents'] > peaks.get(row['currency'], 0) %}{% set _ = peaks.update({row['currency']: row['total_cents']}) %}{% endif %}
+  {% endfor %}
+  {% set mine = monthly | selectattr('currency', 'equalto', company_currency) | list %}
+  {% set best = (mine | sort(attribute='total_cents', reverse=true) | first) if mine else none %}
+
+  <div class="page-hero">
+    <div>
+      <div class="eyebrow">Owner insights</div>
+      <h1>Reports</h1>
+      <p>How the business is doing. Cancelled invoices aren't counted.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="is-blue"><div class="s-label">All-time billed</div><div class="s-value">{{ mine | sum(attribute='total_cents') | money }}</div></div>
+    <div><div class="s-label">Invoices</div><div class="s-value">{{ mine | sum(attribute='invoice_count') }}</div></div>
+    <div class="is-orange"><div class="s-label">Best month</div><div class="s-value" style="font-size:1.1rem;">{{ (best['month'] | nicedate) if best else '—' }}</div></div>
+  </div>
+
+  <div class="dash-grid">
+    <section class="panel" aria-labelledby="monthly-heading">
+      <div class="panel-head"><h2 id="monthly-heading">Revenue by month</h2></div>
+      {% if monthly %}
+      <ul class="hbars">
+        {% for row in monthly %}
+        {% set pk = peaks.get(row['currency'], 1) or 1 %}
+        <li>
+          <span class="lbl">{{ row["month"] | nicedate }}</span>
+          <span class="track"><span style="width: {{ [(row['total_cents'] / pk * 100) | round, 2] | max }}%"></span></span>
+          <span class="amt">{{ row["total_cents"] | money(row["currency"]) }}<span class="sub">{{ row["invoice_count"] }} invoice{{ '' if row["invoice_count"] == 1 else 's' }}</span></span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty"><strong>Nothing to report yet</strong>Totals appear after your first invoice.</div>
+      {% endif %}
+    </section>
+
+    <section class="panel" aria-labelledby="worker-heading">
+      <div class="panel-head"><h2 id="worker-heading">Top sellers</h2></div>
+      {% if by_worker %}
+      <ol class="leader">
+        {% for row in by_worker %}
+        <li>
+          <span class="rank">{% if loop.first %}<i class="ri-trophy-fill" aria-label="Top"></i>{% else %}{{ loop.index }}{% endif %}</span>
+          <div class="who"><b>{{ row["worker_email"] }}</b><span>{{ row["invoice_count"] }} invoice{{ '' if row["invoice_count"] == 1 else 's' }}</span></div>
+          <span class="amt">{{ row["total_cents"] | money(row["currency"]) }}</span>
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <div class="empty"><strong>No sales yet</strong>Each teammate's totals show here.</div>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Low stock — Invoice Generator{% endblock %}
+{% macro item(p) %}
+  {% set cap = [p['low_stock_threshold'], 1] | max %}
+  <div class="t-item">
+    <div class="t-row"><b>{{ p['name'] }}</b><span>{{ p['stock'] }} left · alert at {{ p['low_stock_threshold'] }}</span></div>
+    <div class="rank-bar warn" style="margin:0;"><span style="width: {{ [(p['stock'] / cap * 100) | round, 100] | min }}%"></span></div>
+    <form action="/products/restock/{{ p['id'] }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="/low-stock">
+      <label class="visually-hidden" for="rs-{{ p['id'] }}">Units to add for {{ p['name'] }}</label>
+      <input id="rs-{{ p['id'] }}" type="number" name="amount" min="1" placeholder="How many arrived?" required />
+      <button type="submit" class="button-sm">Restock</button>
+    </form>
+  </div>
+{% endmacro %}
+{% block content %}
+  {% set out = products | selectattr('stock', 'le', 0) | list %}
+  {% set low = products | selectattr('stock', 'gt', 0) | list %}
+
+  <div class="page-hero tone-orange">
+    <div>
+      <div class="eyebrow">Needs attention</div>
+      <h1>Low stock</h1>
+      <p>{% if products %}{{ products | length }} product{{ '' if products | length == 1 else 's' }} at or below the alert level. Restock right here when a delivery arrives.{% else %}Nothing needs restocking right now.{% endif %}</p>
+    </div>
+    <div class="hero-actions">
+      <a class="button button-secondary" href="{{ url_for('products_page') }}">All products</a>
+    </div>
+  </div>
+
+  {% if products %}
+  <div class="triage">
+    <section class="lane is-out" aria-labelledby="lane-out">
+      <div class="lane-head">
+        <h2 id="lane-out"><span class="dot" aria-hidden="true"></span> Out of stock</h2>
+        <span class="count">{{ out | length }}</span>
+      </div>
+      {% for p in out %}{{ item(p) }}{% else %}
+      <div class="empty"><strong>None</strong>Nothing has fully run out.</div>
+      {% endfor %}
+    </section>
+
+    <section class="lane is-low" aria-labelledby="lane-low">
+      <div class="lane-head">
+        <h2 id="lane-low"><span class="dot" aria-hidden="true"></span> Running low</h2>
+        <span class="count">{{ low | length }}</span>
+      </div>
+      {% for p in low %}{{ item(p) }}{% else %}
+      <div class="empty"><strong>None</strong>Everything else is above its alert level.</div>
+      {% endfor %}
+    </section>
+  </div>
+  {% else %}
+  <div class="empty">
+    <strong>All good</strong>
+    Every product is above its alert level.
+  </div>
+  {% endif %}
+{% endblock %}

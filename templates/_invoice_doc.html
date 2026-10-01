@@ -1,0 +1,93 @@
+{#
+  The invoice document itself. Shared by the in-app invoice page and the
+  public link customers open from WhatsApp/email, so both always match.
+  Needs: invoice (with paid_cents), items, company.
+#}
+{% set cur = invoice["currency"] %}
+{% set balance = invoice["total_cents"] - (invoice["paid_cents"] or 0) %}
+{% set st = payment_status(invoice) %}
+{% set lbl = PAYMENT_STATUS_LABELS[st] %}
+<article class="invoice-sheet">
+  <div class="sheet-band">
+    <div class="sheet-from">
+      {% if company["logo_file"] %}
+      <img class="sheet-logo" src="{{ url_for('static', filename='uploads/logos/' ~ company['logo_file']) }}" alt="{{ company['name'] }} logo">
+      {% endif %}
+      <div>
+        <b>{{ company["name"] }}</b>
+        {% if company["address"] %}<span>{{ company["address"] }}</span>{% endif %}
+        {% if company["phone"] or company["biz_email"] %}
+        <span>{{ company["phone"] }}{% if company["phone"] and company["biz_email"] %} · {% endif %}{{ company["biz_email"] }}</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="sheet-id">
+      <div class="label">Invoice</div>
+      <div class="invoice-id">#{{ "%05d" | format(invoice["id"]) }}</div>
+      <span class="badge badge-lg {{ lbl[1] }}">{{ lbl[0] }}</span>
+    </div>
+  </div>
+
+  <div class="sheet-body">
+    <dl class="invoice-meta">
+      <div>
+        <dt>Billed to</dt>
+        <dd>
+          {{ invoice["customer"] }}
+          {% if show_admin_links and invoice["customer_id"] %}
+          <span class="no-print"> · <a href="{{ url_for('customer_detail', customer_id=invoice['customer_id']) }}">view</a></span>
+          {% endif %}
+          {% if invoice["customer_email"] %}<br><span class="muted" style="font-weight:500;">{{ invoice["customer_email"] }}</span>{% endif %}
+        </dd>
+      </div>
+      <div>
+        <dt>Date</dt>
+        <dd>{{ invoice["date"] | nicedate }}</dd>
+      </div>
+      {% if balance > 0 and invoice["due_date"] and st != 'cancelled' %}
+      <div>
+        <dt>Due</dt>
+        <dd {% if st == 'overdue' %}style="color:var(--danger)"{% endif %}>{{ invoice["due_date"] | nicedate }}</dd>
+      </div>
+      {% endif %}
+    </dl>
+
+    <table>
+      <thead>
+        <tr><th scope="col">Product</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col" style="text-align:right;">Amount</th></tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td data-label="Product">{{ item["name"] }}</td>
+          <td data-label="Qty">{{ item["quantity"] }}</td>
+          <td data-label="Unit price">{{ item["unit_price_cents"]|money(cur) }}</td>
+          <td data-label="Amount" style="text-align:right;">{{ (item["quantity"] * item["unit_price_cents"])|money(cur) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="sheet-foot">
+      {% if balance > 0 and company["account_number"] and st != 'cancelled' %}
+      <div class="pay-to">
+        <span class="label-sm">Pay by bank transfer</span>
+        <b>{{ company["account_number"] }}</b>
+        <span>{{ company["bank_name"] }}{% if company["account_name"] %} · {{ company["account_name"] }}{% endif %}</span>
+      </div>
+      {% else %}<div></div>{% endif %}
+
+      <div class="sheet-total">
+        <div>
+          <span>{{ 'Total' if (invoice["paid_cents"] or 0) > 0 else 'Total due' }}</span>
+          <strong>{{ invoice["total_cents"]|money(cur) }}</strong>
+          {% if (invoice["paid_cents"] or 0) > 0 and st != 'cancelled' %}
+          <div class="paid-line"><span>Paid</span><b>{{ invoice["paid_cents"]|money(cur) }}</b></div>
+          <div class="paid-line"><span>Balance due</span><b style="color:{{ 'var(--orange)' if balance > 0 else '#15803d' }}">{{ balance|money(cur) }}</b></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% if st == 'paid' %}<p class="thanks">Paid in full. Thank you for your business!</p>{% endif %}
+  </div>
+</article>

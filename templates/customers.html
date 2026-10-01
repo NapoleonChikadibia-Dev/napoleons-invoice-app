@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Customers — Invoice Generator{% endblock %}
+{% macro initials(name) -%}
+  {%- set parts = (name or '?').split() -%}
+  {{- (parts[0][:1] ~ (parts[1][:1] if parts | length > 1 else '')) | upper -}}
+{%- endmacro %}
+{% block content %}
+  <div class="page-hero">
+    <div>
+      <div class="eyebrow">People</div>
+      <h1>Customers</h1>
+      <p>The people and businesses you bill. Open one to see their history.</p>
+    </div>
+    {% if customers %}
+    <div class="summary" style="margin:0; min-width: 300px;">
+      <div class="is-blue"><div class="s-label">Customers</div><div class="s-value">{{ customers | length }}</div></div>
+      <div><div class="s-label">Invoices sent</div><div class="s-value">{{ customers | sum(attribute='invoice_count') }}</div></div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="hint" data-hint="customers" hidden>
+    <span class="hint-icon" aria-hidden="true">i</span>
+    <p><strong>Tip:</strong> you don't have to add customers here first. You can create one on the spot while making an invoice.</p>
+    <button type="button" class="button-ghost button-sm hint-dismiss" data-hint-dismiss>Got it</button>
+  </div>
+
+  <div class="split">
+    <div>
+      {% if customers %}
+      <div class="toolbar">
+        <label class="search">
+          <i class="ri-search-line" aria-hidden="true"></i>
+          <span class="visually-hidden">Search customers</span>
+          <input type="search" placeholder="Search by name, email or phone" data-search="customer-list" />
+        </label>
+        {% set owing = customers | selectattr('owed_cents', 'gt', 0) | list %}
+        <div class="chips" data-chips="customer-list" role="group" aria-label="Filter customers">
+          <button type="button" class="chip" data-chip="all" aria-pressed="true">All<span class="n">{{ customers | length }}</span></button>
+          <button type="button" class="chip" data-chip="owes" aria-pressed="false">Owes you<span class="n">{{ owing | length }}</span></button>
+        </div>
+      </div>
+      <div class="card-grid" id="customer-list">
+        {% for c in customers %}
+        <a class="c-card" href="{{ url_for('customer_detail', customer_id=c['id']) }}"
+           data-item data-text="{{ c['name'] | lower }} {{ c['email'] | lower }} {{ c['phone'] or '' }}"
+           data-state="{{ 'owes' if c['owed_cents'] > 0 else 'clear' }}">
+          <div class="c-top">
+            <span class="initials {{ loop.cycle('', 'alt', 'warm') }}" aria-hidden="true">{{ initials(c['name']) }}</span>
+            <div style="min-width:0;">
+              <div class="c-name">{{ c['name'] }}</div>
+              <div class="c-mail">{{ c['email'] or c['phone'] or 'No contact yet' }}</div>
+            </div>
+          </div>
+          <div class="c-foot">
+            <span>{% if c['phone'] %}<i class="ri-phone-line" aria-hidden="true"></i> {{ c['phone'] }}{% else %}No phone{% endif %}</span>
+            {% if c['owed_cents'] > 0 %}<span class="c-owes">Owes {{ c['owed_cents'] | money }}</span>
+            {% else %}<span><b>{{ c['invoice_count'] }}</b> invoice{{ '' if c['invoice_count'] == 1 else 's' }}</span>{% endif %}
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      <div class="empty no-results" data-empty-for="customer-list"><strong>No customers match</strong>Try a different search.</div>
+      {% else %}
+      <div class="empty">
+        <strong>No customers yet</strong>
+        Add one with the form, or create one while making an invoice.
+      </div>
+      {% endif %}
+    </div>
+
+    <aside>
+      <section class="panel panel-navy panel-compact" aria-labelledby="add-customer-heading">
+        <h2 id="add-customer-heading">Add a customer</h2>
+        <form action="{{ url_for('add_customer') }}" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label for="customer-name">Name</label>
+          <input id="customer-name" type="text" name="name" autocomplete="off" placeholder="e.g. Ada Okafor" required />
+          <label for="customer-phone">Phone / WhatsApp</label>
+          <input id="customer-phone" type="tel" name="phone" autocomplete="off" placeholder="0803 000 0000" />
+          <label for="customer-email">Email <span style="opacity:.6;">(optional)</span></label>
+          <input id="customer-email" type="email" name="email" autocomplete="off" />
+          <div class="form-actions"><button type="submit"><i class="ri-user-add-line" aria-hidden="true"></i> Add customer</button></div>
+        </form>
+      </section>
+    </aside>
+  </div>
+{% endblock %}

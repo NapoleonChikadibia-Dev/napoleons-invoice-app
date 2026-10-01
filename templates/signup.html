@@ -1,0 +1,64 @@
+{% extends "auth_base.html" %}
+{% block title %}Create your account{% endblock %}
+{% block auth_image %}Signup.png{% endblock %}
+
+{% block heading %}
+<h1 class="login_title">Create your free account</h1>
+<p class="login_subtitle">Takes about 20 seconds. You can invite your team later.</p>
+{% endblock %}
+
+{% block content %}
+<form action="{{ url_for('signup') }}" method="post" class="login_form" id="signup-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <!-- Honeypot: hidden from people via CSS, often filled by bots. -->
+    <div class="hp-field" aria-hidden="true">
+        <label for="website">Leave this field blank</label>
+        <input type="text" name="website" id="website" tabindex="-1" autocomplete="off">
+    </div>
+
+    <div class="login_group">
+        <div class="login_box">
+            <input type="text" name="company_name" autocomplete="organization" required placeholder=" "
+                   class="login_input" id="company_name" value="{{ form.get('company_name', '') }}">
+            <label for="company_name" class="login_label">Business name</label>
+            <i class="ri-store-2-fill login_icon" aria-hidden="true"></i>
+        </div>
+        <div class="login_box">
+            <input type="email" name="email" autocomplete="email" required placeholder=" "
+                   class="login_input" id="email" value="{{ form.get('email', '') }}">
+            <label for="email" class="login_label">Your email</label>
+            <i class="ri-mail-fill login_icon" aria-hidden="true"></i>
+        </div>
+        <div class="login_box">
+            <input type="password" name="password" autocomplete="new-password" class="login_input"
+                   required minlength="8" placeholder=" " id="password">
+            <label for="password" class="login_label">Password (8+ characters)</label>
+            <i class="ri-lock-2-fill login_icon" aria-hidden="true"></i>
+        </div>
+        <div class="login_box">
+            <select name="currency" id="currency" class="login_input login_select" required>
+                {% set picked = form.get('currency', default_currency) %}
+                {% for code, (symbol, name) in currencies.items() %}
+                <option value="{{ code }}" {% if code == picked %}selected{% endif %}>{{ symbol }} · {{ name }}</option>
+                {% endfor %}
+            </select>
+            <label for="currency" class="login_label is-fixed">Currency</label>
+            <i class="ri-money-dollar-circle-fill login_icon" aria-hidden="true"></i>
+        </div>
+    </div>
+
+    <button type="submit" class="login_button">Create account</button>
+    <p class="login_sign">Already have an account? <a href="{{ url_for('login') }}">Log in</a></p>
+</form>
+{% endblock %}
+
+{% block aside %}
+<h3>What happens next</h3>
+<p>You'll land on your dashboard straight away.</p>
+<ol>
+    <li><div><strong>Add a product</strong>A checklist walks you through it.</div></li>
+    <li><div><strong>Bill your first customer</strong>Share it on WhatsApp or print it.</div></li>
+    <li><div><strong>Invite your team when ready</strong>Each person gets their own login.</div></li>
+</ol>
+{% endblock %}

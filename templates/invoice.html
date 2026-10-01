@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Invoice #{{ invoice["id"] }} — Invoice Generator{% endblock %}
+{% block main_class %} class="invoice-page"{% endblock %}
+{% block content %}
+  {% set cancelled = invoice["status"] == "cancelled" %}
+  {% set cur = invoice["currency"] %}
+  {% set balance = invoice["total_cents"] - invoice["paid_cents"] %}
+  {% set is_owner = session.get('role') == 'owner' %}
+
+  {% if cancelled %}
+  <div class="cancelled-banner no-print" role="status">This invoice was cancelled. Its stock has been returned.</div>
+  {% endif %}
+
+  {% if is_owner and not company["account_number"] and not cancelled %}
+  <div class="hint no-print" data-hint="business-profile" hidden>
+    <span class="hint-icon" aria-hidden="true">i</span>
+    <p><strong>Make your invoices look official.</strong> Add your logo, phone and bank details once in <a href="{{ url_for('settings_page') }}#business">Settings</a>, and they show on every invoice.</p>
+    <button type="button" class="button-ghost button-sm hint-dismiss" data-hint-dismiss>Got it</button>
+  </div>
+  {% endif %}
+
+  {% set show_admin_links = true %}
+  {% include "_invoice_doc.html" %}
+
+  {# ---------- Share & print ---------- #}
+  {% if not cancelled %}
+  {% set wa_text -%}
+Hello {{ invoice['customer'] }}, here is your invoice #{{ "%05d" | format(invoice['id']) }} from {{ company['name'] }} for {{ invoice['total_cents']|money(cur) }}.
+{%- if balance > 0 %} Balance due: {{ balance|money(cur) }}{% if invoice['due_date'] %} by {{ invoice['due_date']|nicedate }}{% endif %}.{% else %} Paid in full, thank you!{% endif %}
+
+View or download it here: {{ share_url }}
+  {%- endset %}
+  {% set wa_num = whatsapp_number(customer_phone) %}
+  <div class="no-print share-bar" aria-label="Send this invoice">
+    <a class="button button-whatsapp" target="_blank" rel="noopener"
+       href="https://wa.me/{{ wa_num }}?text={{ wa_text | urlencode }}">
+      <i class="ri-whatsapp-line" aria-hidden="true"></i> Send on WhatsApp{% if wa_num %} to {{ customer_phone }}{% endif %}
+    </a>
+    <button type="button" class="button-secondary" data-copy="{{ share_url }}"><i class="ri-link" aria-hidden="true"></i> <span>Copy link</span></button>
+    <button type="button" class="button-secondary" onclick="window.print()"><i class="ri-printer-line" aria-hidden="true"></i> Print / PDF</button>
+    {% if smtp_configured and invoice['customer_email'] %}
+    <form action="{{ url_for('email_invoice', invoice_id=invoice['id']) }}" method="POST"
+          {% if invoice['emailed_at'] %}data-confirm="Send this invoice to {{ invoice['customer_email'] }} again?"{% endif %}>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="button-secondary"><i class="ri-mail-send-line" aria-hidden="true"></i> {{ 'Resend email' if invoice['emailed_at'] else 'Email' }}</button>
+    </form>
+    {% endif %}
+  </div>
+  <p class="email-status no-print">
+    {% if invoice['emailed_at'] %}
+      <i class="ri-checkbox-circle-fill" aria-hidden="true"></i>
+      Emailed to <strong>{{ invoice['customer_email'] }}</strong> on {{ invoice['emailed_at'] | nicedate }}.
+    {% else %}
+      <i class="ri-information-line" aria-hidden="true"></i>
+      The customer's link shows this invoice and your bank details, and they can save it as a PDF. No login needed.
+    {% endif %}
+  </p>
+  {% endif %}
+
+  {# ---------- Payments ---------- #}
+  <section class="panel pay-panel no-print" aria-labelledby="pay-heading">
+    <div class="panel-head"><h2 id="pay-heading">Payments</h2></div>
+    <div class="pay-summary">
+      <div><span>Total</span><b>{{ invoice["total_cents"]|money(cur) }}</b></div>
+      <div class="done"><span>Paid</span><b>{{ invoice["paid_cents"]|money(cur) }}</b></div>
+      <div class="{{ 'owe' if balance > 0 and not cancelled else '' }}"><span>Balance</span><b>{{ (balance if not cancelled else 0)|money(cur) }}</b></div>
+    </div>
+
+    {% if payments %}
+    <ul class="pay-list">
+      {% for p in payments %}
+      <li>
+        <span class="amt">{{ p["amount_cents"]|money(cur) }}</span>
+        <span class="meta">{{ PAYMENT_METHODS.get(p["method"], p["method"]) }} · {{ p["paid_on"]|nicedate }}{% if p["recorded_by_email"] %} · by {{ p["recorded_by_email"] }}{% endif %}{% if p["note"] %} · {{ p["note"] }}{% endif %}</span>
+        {% if is_owner %}
+        <form action="{{ url_for('delete_payment', payment_id=p['id']) }}" method="POST" data-confirm="Remove this payment of {{ p['amount_cents']|money(cur) }}?">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="button-ghost button-sm">Remove</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if not cancelled and balance > 0 %}
+    <form action="{{ url_for('record_payment', invoice_id=invoice['id']) }}" method="POST" class="pay-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="grow">
+        <label for="pay-amount">Amount received</label>
+        <input id="pay-amount" type="text" inputmode="decimal" name="amount" value="{{ '%.2f' | format(balance / 100) }}" required>
+      </div>
+      <div>
+        <label for="pay-method2">How</label>
+        <select id="pay-method2" name="method">
+          {% for key, label in PAYMENT_METHODS.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="grow">
+        <label for="pay-note">Note <span class="muted">(optional)</span></label>
+        <input id="pay-note" type="text" name="note" maxlength="200" placeholder="e.g. GTB transfer ref 123">
+      </div>
+      <button type="submit"><i class="ri-hand-coin-line" aria-hidden="true"></i> Record payment</button>
+    </form>
+    {% elif not cancelled %}
+    <p class="muted" style="margin:0;"><i class="ri-checkbox-circle-fill" style="color:#16a34a" aria-hidden="true"></i> Fully paid.</p>
+    {% endif %}
+  </section>
+
+  <div class="no-print invoice-actions" aria-label="More actions">
+    <a class="back-link" style="margin:0;" href="{{ url_for('invoice_history') }}">← All invoices</a>
+    <span class="spacer"></span>
+    {% if is_owner and not cancelled %}
+    <form action="{{ url_for('cancel_invoice', invoice_id=invoice['id']) }}" method="POST"
+          data-confirm="Cancel invoice #{{ invoice['id'] }}? The stock on it will be restored. This can't be undone.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="button-ghost">Cancel invoice</button>
+    </form>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-copy]");
+    if (!btn) return;
+    var label = btn.querySelector("span"), text = btn.getAttribute("data-copy");
+    function done(ok) { label.textContent = ok ? "Copied!" : "Copy failed"; setTimeout(function () { label.textContent = "Copy link"; }, 2000); }
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+    else { window.prompt("Copy this link:", text); }
+  });
+</script>
+{% endblock %}
